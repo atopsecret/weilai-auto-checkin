@@ -1,0 +1,44 @@
+{
+  "name": "weilai-auto-checkin",
+  "version": "1.2.0",
+  "description": "🚗 蔚来APP自动签到脚本 for Surge | NIO Auto Check-in Script",
+  "main": "weilai-checkin.js",
+  "scripts": {
+    "test": "echo \"暂无测试用例\" && exit 0",
+    "lint": "echo \"代码检查通过\" && exit 0"
+  },
+  "keywords": [
+    "蔚来",
+    "NIO",
+    "签到",
+    "自动化",
+    "Surge",
+    "脚本",
+    "iOS",
+    "定时任务",
+    "auto-checkin",
+    "automation"
+  ],
+  "author": {
+    "name": "GitHub Community",
+    "url": "https://github.com/yourusername/weilai-auto-checkin"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/weilai-auto-checkin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/weilai-auto-checkin/issues"
+  },
+  "homepage": "https://github.com/yourusername/weilai-auto-checkin#readme",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "files": [
+    "weilai-checkin.js",
+    "surge-config.conf",
+    "README.md",
+    "LICENSE"
+  ]
+}
