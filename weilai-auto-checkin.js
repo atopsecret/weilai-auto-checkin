@@ -16,8 +16,8 @@
  * 3. 享受全自动签到
  * 
  * 作者: GitHub Community
- * 版本: v2.0.0
- * 更新时间: 2024-12-26
+ * 版本: v2.0.1
+ * 更新时间: 2026-01-03
  * 仓库地址: https://github.com/yourusername/weilai-auto-checkin
  */
 
@@ -256,49 +256,77 @@ function buildHeaders(token) {
     };
 }
 
+// 从响应数据中提取签到统计信息
+function extractCheckinStats(result) {
+    const data = result.data || {};
+    const stats = data.stats || {};
+    const awardInfo = data.award_info || {};
+    
+    // 打印原始数据结构用于调试
+    console.log("📋 原始响应数据:", JSON.stringify(result, null, 2));
+    
+    // 支持多种字段名，兼容不同API版本和响应结构
+    const continuousDays = stats.continuous_checkin_days || 
+                           stats.continuousDays || 
+                           stats.consecutive_days ||
+                           data.continuous_checkin_days ||
+                           data.continuousDays ||
+                           data.consecutive_days ||
+                           awardInfo.continuous_days ||
+                           awardInfo.continuous_checkin_days ||
+                           0;
+                           
+    const accumulateDays = stats.accumulate_days || 
+                           stats.accumulateDays || 
+                           stats.total_days ||
+                           data.accumulate_days ||
+                           data.accumulateDays ||
+                           data.total_days ||
+                           awardInfo.total_days ||
+                           awardInfo.accumulate_days ||
+                           0;
+    
+    const checkinTime = stats.checkin_time || data.checkin_time || '';
+    const tip = data.tip || "签到完成";
+    
+    return { continuousDays, accumulateDays, checkinTime, tip };
+}
+
 // 处理签到响应
 function handleResponse(response, data) {
     try {
         const result = JSON.parse(data);
         
+        // 提取统计信息（无论哪种响应都尝试提取）
+        const { continuousDays, accumulateDays, checkinTime, tip } = extractCheckinStats(result);
+        
         // 检查签到结果
         if (response.status === 200 && result.result_code === 'success') {
-            const stats = result.data?.stats || {};
-            const tip = result.data?.tip || "签到完成";
-            
-            // 支持多种字段名，兼容不同API版本
-            const continuousDays = stats.continuous_checkin_days || 
-                                   stats.continuousDays || 
-                                   stats.consecutive_days || 
-                                   result.data?.continuous_checkin_days || 
-                                   result.data?.award_info?.continuous_days || 
-                                   0;
-                                   
-            const accumulateDays = stats.accumulate_days || 
-                                   stats.accumulateDays || 
-                                   stats.total_days || 
-                                   result.data?.accumulate_days || 
-                                   result.data?.award_info?.total_days || 
-                                   0;
-                                   
-            const checkinTime = stats.checkin_time ? formatDateTime(stats.checkin_time) : '';
+            const checkinTimeStr = checkinTime ? formatDateTime(checkinTime) : '';
             
             console.log("✅ 签到成功!");
-            console.log(`📅 签到时间: ${checkinTime}`);
+            if (checkinTimeStr) console.log(`📅 签到时间: ${checkinTimeStr}`);
             console.log(`🔥 连续签到: ${continuousDays} 天`);
             console.log(`📊 累计签到: ${accumulateDays} 天`);
             
-            const message = `${tip}\n� 连续签到: ${continuousDays} 天\n�📊 累计签到: ${accumulateDays} 天`;
+            let message = tip;
+            if (continuousDays > 0 || accumulateDays > 0) {
+                message = `${tip}\n🔥 连续签到: ${continuousDays} 天\n📊 累计签到: ${accumulateDays} 天`;
+            }
             $notification.post("蔚来签到", "签到成功 🎉", message);
             
             return { success: true, message: tip };
             
         } else if (result.data?.checked_in === true) {
-            const tip = result.data?.tip || "今日已签到";
             console.log("ℹ️ 今日已签到");
-            console.log(`💡 提示: ${tip}`);
+            console.log(`🔥 连续签到: ${continuousDays} 天`);
+            console.log(`📊 累计签到: ${accumulateDays} 天`);
             
-            $notification.post("蔚来签到", "今日已签到 ✅", tip);
+            let message = tip;
+            if (continuousDays > 0 || accumulateDays > 0) {
+                message = `${tip}\n🔥 连续签到: ${continuousDays} 天\n📊 累计签到: ${accumulateDays} 天`;
+            }
+            $notification.post("蔚来签到", "今日已签到 ✅", message);
             return { success: true, message: tip };
             
         } else {
@@ -384,7 +412,7 @@ function main() {
     // 如果是签到模式
     console.log("🔄 蔚来全自动签到脚本启动");
     console.log(`📅 当前时间: ${new Date().toLocaleString('zh-CN')}`);
-    console.log(`🔧 脚本版本: v2.0.0 (融合版)`);
+    console.log(`🔧 脚本版本: v2.0.1 (融合版)`);
     console.log(`🌐 请求域名: ${CONFIG.baseURL}`);
     
     // 获取有效token
