@@ -16,8 +16,8 @@
  * 3. 享受全自动签到
  * 
  * 作者: GitHub Community
- * 版本: v2.0.1
- * 更新时间: 2026-01-03
+ * 版本: v2.0.2
+ * 更新时间: 2026-01-04
  * 仓库地址: https://github.com/yourusername/weilai-auto-checkin
  */
 
@@ -293,7 +293,7 @@ function extractCheckinStats(result) {
 }
 
 // 处理签到响应
-function handleResponse(response, data) {
+function handleResponse(response, data, token, callback) {
     try {
         const result = JSON.parse(data);
         
@@ -306,6 +306,14 @@ function handleResponse(response, data) {
             
             console.log("✅ 签到成功!");
             if (checkinTimeStr) console.log(`📅 签到时间: ${checkinTimeStr}`);
+            
+            // 如果累计天数为0，说明签到成功响应中没有统计信息，需要再请求一次获取
+            if (accumulateDays === 0) {
+                console.log("📊 签到成功响应中无统计信息，正在获取...");
+                fetchCheckinStats(token, tip, callback);
+                return { success: true, message: tip, needFetchStats: true };
+            }
+            
             console.log(`🔥 连续签到: ${continuousDays} 天`);
             console.log(`📊 累计签到: ${accumulateDays} 天`);
             
@@ -315,6 +323,7 @@ function handleResponse(response, data) {
             }
             $notification.post("蔚来签到", "签到成功 🎉", message);
             
+            if (callback) callback();
             return { success: true, message: tip };
             
         } else if (result.data?.checked_in === true) {
@@ -327,6 +336,7 @@ function handleResponse(response, data) {
                 message = `${tip}\n🔥 连续签到: ${continuousDays} 天\n📊 累计签到: ${accumulateDays} 天`;
             }
             $notification.post("蔚来签到", "今日已签到 ✅", message);
+            if (callback) callback();
             return { success: true, message: tip };
             
         } else {
@@ -334,6 +344,7 @@ function handleResponse(response, data) {
             console.log("❌ 签到失败:", result);
             
             $notification.post("蔚来签到", "签到失败 ❌", errorMsg);
+            if (callback) callback();
             return { success: false, message: errorMsg };
         }
     } catch (e) {
@@ -341,8 +352,54 @@ function handleResponse(response, data) {
         console.log("📄 原始响应:", data);
         
         $notification.post("蔚来签到", "解析失败 ⚠️", "响应格式异常");
+        if (callback) callback();
         return { success: false, message: "响应解析异常" };
     }
+}
+
+// 签到成功后获取统计信息
+function fetchCheckinStats(token, tip, callback) {
+    const params = buildParams();
+    const url = buildURL(params);
+    const headers = buildHeaders(token);
+    const body = "event=checkin";
+    
+    const request = {
+        url: url,
+        method: "POST",
+        headers: headers,
+        body: body
+    };
+    
+    console.log("📊 正在获取签到统计信息...");
+    
+    $httpClient.post(request, (error, response, data) => {
+        if (error) {
+            console.log("⚠️ 获取统计信息失败:", error);
+            $notification.post("蔚来签到", "签到成功 🎉", tip);
+            if (callback) callback();
+            return;
+        }
+        
+        try {
+            const result = JSON.parse(data);
+            const { continuousDays, accumulateDays } = extractCheckinStats(result);
+            
+            console.log(`🔥 连续签到: ${continuousDays} 天`);
+            console.log(`📊 累计签到: ${accumulateDays} 天`);
+            
+            let message = tip;
+            if (continuousDays > 0 || accumulateDays > 0) {
+                message = `${tip}\n🔥 连续签到: ${continuousDays} 天\n📊 累计签到: ${accumulateDays} 天`;
+            }
+            $notification.post("蔚来签到", "签到成功 🎉", message);
+        } catch (e) {
+            console.log("⚠️ 解析统计信息失败:", e);
+            $notification.post("蔚来签到", "签到成功 🎉", tip);
+        }
+        
+        if (callback) callback();
+    });
 }
 
 // 执行签到请求 (支持重试)
@@ -384,7 +441,14 @@ function performCheckin(token, retryCount = 0) {
         console.log(`📊 响应状态码: ${response.status}`);
         console.log(`📄 响应数据长度: ${data ? data.length : 0} 字节`);
         
-        const result = handleResponse(response, data);
+        const result = handleResponse(response, data, token, () => {
+            $done();
+        });
+        
+        // 如果需要获取统计信息，handleResponse 会自己处理 $done()
+        if (result.needFetchStats) {
+            return;
+        }
         
         if (!result.success && retryCount < CONFIG.maxRetries) {
             console.log(`⏳ ${CONFIG.retryDelay/1000}秒后重试...`);
@@ -412,7 +476,7 @@ function main() {
     // 如果是签到模式
     console.log("🔄 蔚来全自动签到脚本启动");
     console.log(`📅 当前时间: ${new Date().toLocaleString('zh-CN')}`);
-    console.log(`🔧 脚本版本: v2.0.1 (融合版)`);
+    console.log(`🔧 脚本版本: v2.0.2 (融合版)`);
     console.log(`🌐 请求域名: ${CONFIG.baseURL}`);
     
     // 获取有效token
